@@ -124,7 +124,7 @@ function main() {
   canvas.onmousemove  = function(ev) { if (ev.buttons == 1) click(ev); }; // click and drag
 
   // Specify the color for clearing <canvas>
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearColor(0.678, 0.847, 1, 1.0);
 
   // Clear <canvas>
   // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -187,43 +187,83 @@ function click(ev) {
 
 function renderFishBody() {
   // 鱼体各部分高度比例
-  let fishHeights = [1, 2, 2.5, 3.5, 4.8, 4.3, 3.5, 2.5, 4.0, 5];
-  
+  let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
+
+  // 定义每个部分的颜色数组（RGBA）
+  let fishColors = [
+    [1.0, 0.5, 0.0, 1.0],  // 橙色
+    [1.0, 0.5, 0.0, 1.0],  // 橙色（眼睛在此部分）
+    [1.0, 1.0, 1.0, 1.0],  // 白色
+    [1.0, 0.5, 0.0, 1.0],  // 橙色
+    [0.0, 0.0, 0.0, 1.0],  // 黑色
+    [1.0, 1.0, 1.0, 1.0],  // 白色
+    [1.0, 0.5, 0.0, 1.0],  // 橙色
+    [1.0, 1.0, 1.0, 1.0],  // 白色
+    [1.0, 0.5, 0.0, 1.0],  // 橙色
+    [0.0, 0.0, 0.0, 1.0]   // 黑色
+  ];
+
   // 基本尺寸
-  let baseWidth = 0.08;    // 宽度（x方向）
-  let baseDepth = 0.1;    // 深度（z方向）
-  let heightFactor = 0.1; // 实际高度 = fishHeights[i] * heightFactor
-  
+  let baseWidth = 0.08;   // 每段鱼体的宽度
+  let baseDepth = 0.1;    // 每段鱼体的深度
+  let heightFactor = 0.1; // 高度因子
+
+  // 眼睛尺寸 & 位置参数
+  let eyeSize = 0.05;        // 眼睛的大小
+  let eyeOffsetZ = baseDepth / 2; // **让眼睛刚好贴住矩形的前后表面**
+
   // 间隙
   let gap = 0.01;
-  
+
   // 计算总宽度和起始 x 坐标（使鱼体居中显示）
   let totalWidth = fishHeights.length * (baseWidth + gap);
   let startX = -totalWidth / 2;
-  
-  // 定义 y 方向的偏移量数组（长度应与 fishHeights 数组一致）
-  let yOffsets = [0, -0.1, -0.15, -0.25, -0.35, -0.30, -0.25, -0.15, -0.3, -0.4];
-  
+
+  // 定义 y 方向的偏移量数组
+  let yOffsets = [0, -0.1, -0.15, -0.25, -0.38, -0.30, -0.25, -0.15, -0.3, -0.4];
+
   // 循环绘制鱼体的每个部分
   for (let i = 0; i < fishHeights.length; i++) {
     let part = new Cube();
-    // 设置颜色为蓝色调
-    part.color = [0.0, 0.5, 1.0, 1.0];
-    
+    part.color = fishColors[i] || [0.0, 0.5, 1.0, 1.0];
+
     // 计算当前部分的实际高度
     let currentHeight = fishHeights[i] * heightFactor;
-    // 计算当前部分中心的 x 坐标
+    // 计算 x 坐标
     let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
-    // 计算 y 坐标：默认使底部在 y=0，故中心 y 为高度的一半，再加上偏移量
+    // 计算 y 坐标
     let yPos = currentHeight / 2 + yOffsets[i];
-    
-    // 设置当前部件的局部变换
+
+    // 设置当前部件的局部变换：
     part.matrix.setTranslate(xPos, yPos, 0);
     part.matrix.scale(baseWidth, currentHeight, baseDepth);
-    
+
     part.render();
+
+    // **在第二个长方形（索引1）处添加眼睛**
+    if (i === 1) {
+      let leftEye = new Cube();
+      let rightEye = new Cube();
+      
+      leftEye.color = [0.0, 0.0, 0.0, 1.0];  // 黑色眼睛
+      rightEye.color = [0.0, 0.0, 0.0, 1.0]; // 黑色眼睛
+
+      // **让眼睛贴住矩形的前后表面**
+      // 左眼（前表面）
+      leftEye.matrix.setTranslate(xPos, yPos + 0.07, eyeOffsetZ + 0.05);
+      leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1);  // **减小 z 轴深度**
+      leftEye.render();
+
+      // 右眼（后表面）
+      rightEye.matrix.setTranslate(xPos, yPos + 0.07, -eyeOffsetZ + 0.04);
+      rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4);  // **减小 z 轴深度**
+      rightEye.render();
+    }
   }
 }
+
+
+
 
 
 function renderAllShapes() {
