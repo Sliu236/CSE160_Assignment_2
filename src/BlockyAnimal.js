@@ -300,13 +300,11 @@ function renderUnderwaterMountains() {
       let data = tetrahedronPositions[i];
       let tetrahedron = new Tetrahedron();
       tetrahedron.color = data.color;
-      tetrahedron.matrix.translate(data.x, data.y, 0.0); // 位置
-      tetrahedron.matrix.scale(data.scale, data.scale, data.scale); // 缩小
+      tetrahedron.matrix.translate(data.x, data.y, 0.0); 
+      tetrahedron.matrix.scale(data.scale, data.scale, data.scale); 
       tetrahedron.render();
   }
 }
-
-
 
 
 function renderScene() {
