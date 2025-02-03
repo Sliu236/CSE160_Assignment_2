@@ -44,6 +44,8 @@ function setupWebGL() {
       console.log('Failed to get the rendering context for WebGL');
       return;
     }
+
+    gl.enable(gl.DEPTH_TEST);
 }
 
 function connectVariablesToGLSL() { 
@@ -92,23 +94,20 @@ let g_selectedColor = [1.0, 1.0, 1.0, 1.0]; // White
 let g_selectedSize = 5; // Default point size
 let g_selectedType = POINT;
 let g_selectedSegments = 10;
+let g_yellowAngle = 0.0;
+let g_magentaAngle = 0;
+let g_yellowAnimation = false;
 
 function addActionForHtmlUI() {
-
-  document.getElementById('green').onclick = function() { g_selectedColor = [0.0,1.0,0.0,1.0]; }; // Green
-  document.getElementById('red').onclick = function() { g_selectedColor = [1.0,0.0,0.0,1.0]; }; // Red
-  document.getElementById('clearButton').onclick = function() { g_shapeList = []; renderAllShapes()}; // Clear
-
-  document.getElementById('pointButton').onclick = function() { g_selectedType = POINT}; // Point
-  document.getElementById('triButton').onclick = function() { g_selectedType = TRIANGLE}; // Triangle
-  document.getElementById('circleButton').onclick = function() { g_selectedType = CIRCLE}; // Triangle
-
-  // slider event handling
-  document.getElementById('redSlide').addEventListener('mouseup', function() { g_selectedColor[0] = this.value/100; }); // Red
-  document.getElementById('greenSlide').addEventListener('mouseup', function() { g_selectedColor[1] = this.value/100; }); // Green
-  document.getElementById('blueSlide').addEventListener('mouseup', function() { g_selectedColor[2] = this.value/100; }); // Blue
-
-  document.getElementById('angleSlide').addEventListener('mouseup', function() { g_globalAngle = this.value; renderAllShapes()}); // Angle
+  // Button Event
+  document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_yellowAnimation=true;});
+  document.getElementById('AnimationYellowOffButton').addEventListener('click', function() { g_yellowAnimation=false;});
+  
+  // Yellow
+  document.getElementById('yellowSlide').addEventListener('mousemove', function() {g_yellowAngle = this.value; renderAllShapes();}); // Yellow
+  document.getElementById('megenta').addEventListener('mousemove', function() {g_magentaAngle = this.value; renderAllShapes();}); // magenta
+  // Camera
+  document.getElementById('angleSlide').addEventListener('mousemove', function() { g_globalAngle = this.value; renderAllShapes();}); // Angle
 }
 
 function main() {
@@ -128,17 +127,33 @@ function main() {
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
   // Clear <canvas>
-  // gl.clear(gl.COLOR_BUFFER_BIT);
+  // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  renderAllShapes(); // Render all shapes
+  //renderAllShapes(); // Render all shapes
+
+  requestAnimationFrame(tick);
 }
 
+var g_startTime = performance.now() / 1000.0;
+var g_seconds = performance.now()/1000.0 - g_startTime;
 
-var g_shapeList = [];
+function tick() {
+  console.log(performance.now());
 
-//var g_points = [];  // The array for the position of a mouse press
-//var g_colors = [];  // The array to store the color of a point
-//var g_sizes = [];  // The array to store the size of a point
+  g_seconds = performance.now()/1000.0 - g_startTime;
+
+  updateAnimationAngles();
+
+  renderAllShapes();
+
+  requestAnimationFrame(tick);
+}
+
+function updateAnimationAngles() {
+  if (g_yellowAnimation) {
+    g_yellowAngle = 45*Math.sin(g_seconds);
+  }
+}
 
 
 function click(ev) {
@@ -170,45 +185,64 @@ function click(ev) {
   renderAllShapes();
 }
 
-function convertCoordinatesEventToGL(ev) {
-  var x = ev.clientX; // x coordinate of a mouse pointer
-  var y = ev.clientY; // y coordinate of a mouse pointer
-  var rect = ev.target.getBoundingClientRect();
-
-  x = ((x - rect.left) - canvas.width/2)/(canvas.width/2);
-  y = (canvas.height/2 - (y - rect.top))/(canvas.height/2);
-
-  return ([x, y]);
+function renderFishBody() {
+  // 鱼体各部分高度比例
+  let fishHeights = [1, 2, 2.5, 3.5, 4.8, 4.3, 3.5, 2.5, 4.0, 5];
+  
+  // 基本尺寸
+  let baseWidth = 0.08;    // 宽度（x方向）
+  let baseDepth = 0.1;    // 深度（z方向）
+  let heightFactor = 0.1; // 实际高度 = fishHeights[i] * heightFactor
+  
+  // 间隙
+  let gap = 0.01;
+  
+  // 计算总宽度和起始 x 坐标（使鱼体居中显示）
+  let totalWidth = fishHeights.length * (baseWidth + gap);
+  let startX = -totalWidth / 2;
+  
+  // 定义 y 方向的偏移量数组（长度应与 fishHeights 数组一致）
+  let yOffsets = [0, -0.1, -0.15, -0.25, -0.35, -0.30, -0.25, -0.15, -0.3, -0.4];
+  
+  // 循环绘制鱼体的每个部分
+  for (let i = 0; i < fishHeights.length; i++) {
+    let part = new Cube();
+    // 设置颜色为蓝色调
+    part.color = [0.0, 0.5, 1.0, 1.0];
+    
+    // 计算当前部分的实际高度
+    let currentHeight = fishHeights[i] * heightFactor;
+    // 计算当前部分中心的 x 坐标
+    let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
+    // 计算 y 坐标：默认使底部在 y=0，故中心 y 为高度的一半，再加上偏移量
+    let yPos = currentHeight / 2 + yOffsets[i];
+    
+    // 设置当前部件的局部变换
+    part.matrix.setTranslate(xPos, yPos, 0);
+    part.matrix.scale(baseWidth, currentHeight, baseDepth);
+    
+    part.render();
+  }
 }
 
-function renderAllShapes() {
 
+function renderAllShapes() {
   var startTime = performance.now();
 
   var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
-  // Clear <canvas>
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  // 清除颜色和深度缓冲区
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  drawTriangle3D([-1.0,0.0,0.0, -0.5,-1.0,0.0, 0.0,0.0,0.0]);
-
-  var body = new Cube();
-  body.color = [1.0,0.0,0.0,1.0];
-  body.matrix.translate(-.25, -.5, 0.0);
-  body.matrix.scale(0.5, 1, 0.5);
-  body.render();
-
-  var leftArm = new Cube();
-  leftArm.color = [1,1,0,1];
-  leftArm.matrix.translate(0.7, 0, 0.0);
-  leftArm.matrix.rotate(45,0,0,1);
-  leftArm.matrix.scale(0.25, 0.7, 0.5);
-  leftArm.render();
+  // 绘制鱼体
+  renderFishBody();
 
   var duration = performance.now() - startTime;
-  sentTextToHTML("numdots: " + len + " ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
+  sentTextToHTML("ms: " + Math.floor(duration) + " fps: " +
+      Math.floor(10000/duration)/10, "numdot");
 }
+
 
 function sentTextToHTML(text, htmlID) {
   var htmlElm = document.getElementById(htmlID);
