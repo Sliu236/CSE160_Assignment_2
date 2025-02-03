@@ -186,77 +186,63 @@ function click(ev) {
 }
 
 function renderFishBody() {
-  // 鱼体各部分高度比例
   let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
 
-  // 定义每个部分的颜色数组（RGBA）
   let fishColors = [
-    [1.0, 0.5, 0.0, 1.0],  // 橙色
-    [1.0, 0.5, 0.0, 1.0],  // 橙色（眼睛在此部分）
-    [1.0, 1.0, 1.0, 1.0],  // 白色
-    [1.0, 0.5, 0.0, 1.0],  // 橙色
-    [0.0, 0.0, 0.0, 1.0],  // 黑色
-    [1.0, 1.0, 1.0, 1.0],  // 白色
-    [1.0, 0.5, 0.0, 1.0],  // 橙色
-    [1.0, 1.0, 1.0, 1.0],  // 白色
-    [1.0, 0.5, 0.0, 1.0],  // 橙色
-    [0.0, 0.0, 0.0, 1.0]   // 黑色
+    [1.0, 0.5, 0.0, 1.0],  
+    [1.0, 0.5, 0.0, 1.0],  
+    [1.0, 1.0, 1.0, 1.0],  
+    [1.0, 0.5, 0.0, 1.0],  
+    [0.0, 0.0, 0.0, 1.0],  
+    [1.0, 1.0, 1.0, 1.0],  
+    [1.0, 0.5, 0.0, 1.0],  
+    [1.0, 1.0, 1.0, 1.0],  
+    [1.0, 0.5, 0.0, 1.0],  
+    [0.0, 0.0, 0.0, 1.0]   
   ];
 
-  // 基本尺寸
-  let baseWidth = 0.08;   // 每段鱼体的宽度
-  let baseDepth = 0.1;    // 每段鱼体的深度
-  let heightFactor = 0.1; // 高度因子
+  let baseWidth = 0.08;   
+  let baseDepth = 0.1;    
+  let heightFactor = 0.1; 
 
-  // 眼睛尺寸 & 位置参数
-  let eyeSize = 0.05;        // 眼睛的大小
-  let eyeOffsetZ = baseDepth / 2; // **让眼睛刚好贴住矩形的前后表面**
+  let eyeSize = 0.05;        
+  let eyeOffsetZ = baseDepth / 2; 
 
-  // 间隙
+
   let gap = 0.01;
 
-  // 计算总宽度和起始 x 坐标（使鱼体居中显示）
+
   let totalWidth = fishHeights.length * (baseWidth + gap);
   let startX = -totalWidth / 2;
 
-  // 定义 y 方向的偏移量数组
   let yOffsets = [0, -0.1, -0.15, -0.25, -0.38, -0.30, -0.25, -0.15, -0.3, -0.4];
 
-  // 循环绘制鱼体的每个部分
   for (let i = 0; i < fishHeights.length; i++) {
     let part = new Cube();
     part.color = fishColors[i] || [0.0, 0.5, 1.0, 1.0];
 
-    // 计算当前部分的实际高度
     let currentHeight = fishHeights[i] * heightFactor;
-    // 计算 x 坐标
     let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
-    // 计算 y 坐标
     let yPos = currentHeight / 2 + yOffsets[i];
 
-    // 设置当前部件的局部变换：
     part.matrix.setTranslate(xPos, yPos, 0);
     part.matrix.scale(baseWidth, currentHeight, baseDepth);
 
     part.render();
 
-    // **在第二个长方形（索引1）处添加眼睛**
     if (i === 1) {
       let leftEye = new Cube();
       let rightEye = new Cube();
       
-      leftEye.color = [0.0, 0.0, 0.0, 1.0];  // 黑色眼睛
-      rightEye.color = [0.0, 0.0, 0.0, 1.0]; // 黑色眼睛
+      leftEye.color = [0.0, 0.0, 0.0, 1.0];  
+      rightEye.color = [0.0, 0.0, 0.0, 1.0];
 
-      // **让眼睛贴住矩形的前后表面**
-      // 左眼（前表面）
       leftEye.matrix.setTranslate(xPos, yPos + 0.07, eyeOffsetZ + 0.05);
-      leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1);  // **减小 z 轴深度**
+      leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1); 
       leftEye.render();
 
-      // 右眼（后表面）
       rightEye.matrix.setTranslate(xPos, yPos + 0.07, -eyeOffsetZ + 0.04);
-      rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4);  // **减小 z 轴深度**
+      rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4); 
       rightEye.render();
     }
   }
@@ -272,10 +258,8 @@ function renderAllShapes() {
   var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
-  // 清除颜色和深度缓冲区
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // 绘制鱼体
   renderFishBody();
 
   var duration = performance.now() - startTime;
