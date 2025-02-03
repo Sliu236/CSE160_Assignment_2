@@ -5,13 +5,14 @@
 
 Notes to Grader:
 [N/A]*/
-var VSHADER_SOURCE =
-  'attribute vec4 a_Position;\n' +
-  'uniform float u_Size;\n' +
-  'void main() {\n' +
-  '  gl_Position = a_Position;\n' +
-  '  gl_PointSize = u_Size;\n' +
-  '}\n';
+var VSHADER_SOURCE = `
+  attribute vec4 a_Position;
+  uniform mat4 u_ModelMatrix;
+  uniform mat4 u_GlobalRotateMatrix;
+  void main() {
+    gl_Position = u_GlobalRotateMatrix * u_ModelMatrix * a_Position;
+  }`
+
 
 // Fragment shader program
 var FSHADER_SOURCE =
@@ -27,6 +28,9 @@ let gl;
 let a_Position;
 let u_FragColor;
 let u_Size;
+let u_ModelMatrix;
+let u_GlobalRotateMatrix;
+let g_globalAngle = 0.0;
 let isRandomColorMode = false;
 
 function setupWebGL() {
@@ -63,11 +67,20 @@ function connectVariablesToGLSL() {
       return;
     }
 
-    u_Size = gl.getUniformLocation(gl.program, 'u_Size');
-    if(!u_Size) {
-      console.log('Failed to get the storage location of u_Size');
+    u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+    if (!u_ModelMatrix) {
+      console.log('Failed to get the storage location of u_ModelMatrix');
       return;
     }
+
+    u_GlobalRotateMatrix = gl.getUniformLocation(gl.program, 'u_GlobalRotateMatrix');
+    if (!u_GlobalRotateMatrix) {
+      console.log('Failed to get the storage location of u_GlobalRotateMatrix');
+      return;
+    }
+
+    var identitiyM = new Matrix4();
+    gl.uniformMatrix4fv(u_ModelMatrix, false, identitiyM.elements);
 }
 
 const POINT = 0;
@@ -84,27 +97,18 @@ function addActionForHtmlUI() {
 
   document.getElementById('green').onclick = function() { g_selectedColor = [0.0,1.0,0.0,1.0]; }; // Green
   document.getElementById('red').onclick = function() { g_selectedColor = [1.0,0.0,0.0,1.0]; }; // Red
-  document.getElementById('blue').onclick = function() { g_selectedColor = [0.0,0.0,1.0,1.0]; }; // Blue
   document.getElementById('clearButton').onclick = function() { g_shapeList = []; renderAllShapes()}; // Clear
-  document.getElementById('drawPicture').onclick = function() {drawPicture();}; // Draw Picture
-  document.getElementById('enableRandomColor').onclick = function() { isRandomColorMode = true; console.log('Randon mode enabled, have fun!');}; 
-  document.getElementById('disableRandomColor').onclick = function() { isRandomColorMode = false; reseteverything(); console.log('Randon mode disabled, you can select color now!');};
 
   document.getElementById('pointButton').onclick = function() { g_selectedType = POINT}; // Point
   document.getElementById('triButton').onclick = function() { g_selectedType = TRIANGLE}; // Triangle
   document.getElementById('circleButton').onclick = function() { g_selectedType = CIRCLE}; // Triangle
+
   // slider event handling
   document.getElementById('redSlide').addEventListener('mouseup', function() { g_selectedColor[0] = this.value/100; }); // Red
   document.getElementById('greenSlide').addEventListener('mouseup', function() { g_selectedColor[1] = this.value/100; }); // Green
   document.getElementById('blueSlide').addEventListener('mouseup', function() { g_selectedColor[2] = this.value/100; }); // Blue
 
-  // Size slider event handling
-  document.getElementById('sizeSlide').addEventListener('mouseup', function() { g_selectedSize = this.value; }); // Size
-  document.getElementById('segmentSlide').addEventListener('mouseup', function() {g_selectedSegments = parseInt(this.value); }); // Size
-}
-
-function getRandomColor() {
-  return [Math.random(), Math.random(), Math.random(), 1.0];
+  document.getElementById('angleSlide').addEventListener('mouseup', function() { g_globalAngle = this.value; renderAllShapes()}); // Angle
 }
 
 function main() {
@@ -124,7 +128,9 @@ function main() {
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
   // Clear <canvas>
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  // gl.clear(gl.COLOR_BUFFER_BIT);
+
+  renderAllShapes(); // Render all shapes
 }
 
 
@@ -179,13 +185,27 @@ function renderAllShapes() {
 
   var startTime = performance.now();
 
+  var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
+  gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
+
   // Clear <canvas>
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  var len = g_shapeList.length;
-  for(var i = 0; i < len; i++) {
-    g_shapeList[i].render();
-  }
+  drawTriangle3D([-1.0,0.0,0.0, -0.5,-1.0,0.0, 0.0,0.0,0.0]);
+
+  var body = new Cube();
+  body.color = [1.0,0.0,0.0,1.0];
+  body.matrix.translate(-.25, -.5, 0.0);
+  body.matrix.scale(0.5, 1, 0.5);
+  body.render();
+
+  var leftArm = new Cube();
+  leftArm.color = [1,1,0,1];
+  leftArm.matrix.translate(0.7, 0, 0.0);
+  leftArm.matrix.rotate(45,0,0,1);
+  leftArm.matrix.scale(0.25, 0.7, 0.5);
+  leftArm.render();
+
   var duration = performance.now() - startTime;
   sentTextToHTML("numdots: " + len + " ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
 }
@@ -199,95 +219,9 @@ function sentTextToHTML(text, htmlID) {
   htmlElm.innerHTML = text;
 }
 
-function resetCanvas() {
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-}
-
-function reseteverything() {
-  g_selectedColor = [1.0, 1.0, 1.0, 1.0];
-  g_selectedSize = 5;
-  g_selectedType = POINT;
-  g_selectedSegments = 10;
-
-  document.getElementById('redSlide').value = g_selectedColor[0] * 100;
-  document.getElementById('greenSlide').value = g_selectedColor[1] * 100;
-  document.getElementById('blueSlide').value = g_selectedColor[2] * 100;
-  document.getElementById('sizeSlide').value = g_selectedSize;
-  document.getElementById('segmentSlide').value = g_selectedSegments;
-  resetCanvas();
-}
 
 
-function drawPicture() {
-  gl.clearColor(0.53, 0.80, 0.98, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
 
-  // Left fuseelage（white)
-  gl.uniform4f(u_FragColor, 1.0, 1.0, 1.0, 1.0); 
-  drawTriangle([0.0, 0.5, -0.05, 0.45, 0.0, 0.4]);
-  drawTriangle([-0.05, 0.45, -0.1, 0.4, 0.0, 0.4]);
-  drawTriangle([-0.1, 0.4, 0.0, 0.4, -0.1, 0.3]);
-  drawTriangle([0.0, 0.4, -0.1, 0.3, 0.0, 0.2]);
-  drawTriangle([-0.1, 0.3, 0.0, 0.2, -0.1, 0.1]);
-  drawTriangle([0.0, 0.2, -0.1, 0.1, 0.0, 0.0]);
-  drawTriangle([-0.1, 0.1, 0.0, 0.0, -0.1, -0.1]);
-  drawTriangle([0.0, 0.0, -0.1, -0.1, 0.0, -0.2]);
-  drawTriangle([-0.1, -0.1, 0.0, -0.2, -0.1, -0.3]);
-  drawTriangle([0.0, -0.2, -0.1, -0.3, 0.0, -0.3]);
-  drawTriangle([-0.1, -0.4, 0.0, -0.3, -0.1, -0.3]);
-
-  // right fuseelage（white)
-  drawTriangle([0.0, 0.5, 0.05, 0.45, 0.0, 0.4]);
-  drawTriangle([0.05, 0.45, 0.1, 0.4, 0.0, 0.4]);
-  drawTriangle([0.1, 0.4, 0.0, 0.4, 0.1, 0.3]);
-  drawTriangle([0.0, 0.4, 0.1, 0.3, 0.0, 0.2]);
-  drawTriangle([0.1, 0.3, 0.0, 0.2, 0.1, 0.1]);
-  drawTriangle([0.0, 0.2, 0.1, 0.1, 0.0, 0.0]);
-  drawTriangle([0.1, 0.1, 0.0, 0.0, 0.1, -0.1]);
-  drawTriangle([0.0, 0.0, 0.1, -0.1, 0.0, -0.2]);
-  drawTriangle([0.1, -0.1, 0.0, -0.2, 0.1, -0.3]);
-  drawTriangle([0.0, -0.2, 0.1, -0.3, 0.0, -0.3]);
-  drawTriangle([0.1, -0.4, 0.0, -0.3, 0.1, -0.3]);
-
-  // left engine（green)
-  gl.uniform4f(u_FragColor, 0.0, 1.0, 0.0, 1.0); 
-  drawTriangle([-0.2, 0.3, -0.2, 0.2, -0.1, 0.3]);
-
-  // right engine（green)
-  drawTriangle([0.2, 0.2, 0.2, 0.3, 0.1, 0.3]);
-
-  // left wing（blue）
-  gl.uniform4f(u_FragColor, 0.0, 0.0, 1.0, 1.0); 
-  drawTriangle([-0.1, 0.3, -0.1, 0.0, -0.2, 0.0]);
-  drawTriangle([-0.1, 0.3, -0.2, 0.0, -0.3, 0.2]);
-  drawTriangle([-0.2, 0.0, -0.3, 0.0, -0.3, 0.2]);
-  drawTriangle([-0.3, 0.0, -0.4, 0.0, -0.3, 0.2]);
-  drawTriangle([-0.4, 0.0, -0.3, 0.2, -0.5, 0.1]);
-  drawTriangle([-0.5, 0.1, -0.5, 0.0, -0.4, 0.0]);
-
-  // right wing（blue）
-  drawTriangle([0.1, 0.3, 0.1, 0.0, 0.2, 0.0]);
-  drawTriangle([0.1, 0.3, 0.2, 0.0, 0.3, 0.2]);
-  drawTriangle([0.2, 0.0, 0.3, 0.0, 0.3, 0.2]);
-  drawTriangle([0.3, 0.0, 0.4, 0.0, 0.3, 0.2]);
-  drawTriangle([0.4, 0.0, 0.3, 0.2, 0.5, 0.1]);
-  drawTriangle([0.5, 0.1, 0.5, 0.0, 0.4, 0.0]);
-
-  // left tail wing（yellow and red）
-  gl.uniform4f(u_FragColor, 1.0, 1.0, 0.0, 1.0); 
-  drawTriangle([-0.1, -0.2, -0.3, -0.3, -0.3, -0.4]);
-  gl.uniform4f(u_FragColor, 1.0, 0.0, 0.0, 1.0); 
-  drawTriangle([-0.1, -0.2, -0.1, -0.3, -0.3, -0.35]);
-
-  // right tail wing（yellow and red）
-  gl.uniform4f(u_FragColor, 1.0, 1.0, 0.0, 1.0); 
-  drawTriangle([0.1, -0.2, 0.3, -0.3, 0.3, -0.4]);
-  gl.uniform4f(u_FragColor, 1.0, 0.0, 0.0, 1.0); 
-  drawTriangle([0.1, -0.2, 0.1, -0.3, 0.3, -0.35]);
-
-  document.getElementById('clearButton').onclick = function() { resetCanvas();}; // Clear
-}
 
 
 

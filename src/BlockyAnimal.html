@@ -7,7 +7,7 @@ Notes to Grader:
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>CSE160 ASGN1</title>
+    <title>CSE160 ASGN2</title>
   </head>
 
   <body onload="main()">
@@ -21,7 +21,6 @@ Notes to Grader:
 
     <button type="button" id="green">Green</button>
     <button type="button" id="red">Red</button>
-    <button type="button" id="blue">Blue</button>
 
 
     <button type="button" id="clearButton">Clear</button>
@@ -30,9 +29,6 @@ Notes to Grader:
     <button type="button" id="pointButton">Point</button>
     <button type="button" id="triButton">Triangle</button>
     <button type="button" id="circleButton">Circle</button>
-    <button type="button" id="drawPicture">I NEED A PLANE!</button>
-    <button id="enableRandomColor">Random?!(Enable Random Mode)</button>
-    <button id="disableRandomColor">Please be a normal person(Disable Random Mode)</button>
 
     </p>
 
@@ -44,18 +40,13 @@ Notes to Grader:
     Blue <input type="range" min="0" max="100" value="0" class="slider" id ="blueSlide">
     
     <p>
-    Size <input type="range" min="5" max="40" value="0" class="slider" id ="sizeSlide">
+    Camera Angle <input type="range" min="0" max="90" value="5" class="slider" id ="angleSlide">
     <p>
-
-    <p>
-    Segments <input type="range" min="3" max="100" value="10" class="slider" id="segmentSlide">
-    </p>
-    <p>My initial design:</p>
-    <img src="Design.jpg" alt="Initial design using triangles" style="max-width: 100%; height: auto; border: 1px solid #ccc;">
 
     <script src="../lib/webgl-utils.js"></script>
     <script src="../lib/webgl-debug.js"></script>
     <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix.js"></script>
     <script src="Point.js"></script>
     <script src="Triangle.js"></script>
     <script src="Circle.js"></script>

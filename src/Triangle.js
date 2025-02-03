@@ -82,7 +82,7 @@ function drawTriangle3D(vertices) {
    // Write date into the buffer object
    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
  
-   gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+   gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
  
    // Enable the assignment to a_Position variable
    gl.enableVertexAttribArray(a_Position);
