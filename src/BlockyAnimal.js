@@ -97,15 +97,20 @@ let g_selectedSegments = 10;
 let g_yellowAngle = 0.0;
 let g_magentaAngle = 0;
 let g_yellowAnimation = false;
+let g_bodyBendAngle = 0.0;
+let g_headSwing = 0.0;
 
 function addActionForHtmlUI() {
   // Button Event
   document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_yellowAnimation=true;});
   document.getElementById('AnimationYellowOffButton').addEventListener('click', function() { g_yellowAnimation=false;});
+  document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderAllShapes();
+  document.getElementById('headSwingSlider').addEventListener('input', function() {g_headSwing = parseFloat(this.value);renderAllShapes();});
   
+  
+});
+
   // Yellow
-  document.getElementById('yellowSlide').addEventListener('mousemove', function() {g_yellowAngle = this.value; renderAllShapes();}); // Yellow
-  document.getElementById('megenta').addEventListener('mousemove', function() {g_magentaAngle = this.value; renderAllShapes();}); // magenta
   // Camera
   document.getElementById('angleSlide').addEventListener('mousemove', function() { g_globalAngle = this.value; renderAllShapes();}); // Angle
 }
@@ -186,67 +191,102 @@ function click(ev) {
 }
 
 function renderFishBody() {
+  // 鱼体各部分高度比例
   let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
 
+  // 定义颜色数组
   let fishColors = [
-    [1.0, 0.5, 0.0, 1.0],  
-    [1.0, 0.5, 0.0, 1.0],  
-    [1.0, 1.0, 1.0, 1.0],  
-    [1.0, 0.5, 0.0, 1.0],  
-    [0.0, 0.0, 0.0, 1.0],  
-    [1.0, 1.0, 1.0, 1.0],  
-    [1.0, 0.5, 0.0, 1.0],  
-    [1.0, 1.0, 1.0, 1.0],  
-    [1.0, 0.5, 0.0, 1.0],  
-    [0.0, 0.0, 0.0, 1.0]   
+      [1.0, 0.5, 0.0, 1.0],  // 橙色
+      [1.0, 0.5, 0.0, 1.0],  // 橙色（眼睛在此部分）
+      [1.0, 1.0, 1.0, 1.0],  // 白色
+      [1.0, 0.5, 0.0, 1.0],  // 橙色
+      [0.0, 0.0, 0.0, 1.0],  // 黑色（基准点）
+      [1.0, 1.0, 1.0, 1.0],  // 白色
+      [1.0, 0.5, 0.0, 1.0],  // 橙色
+      [1.0, 1.0, 1.0, 1.0],  // 白色
+      [1.0, 0.5, 0.0, 1.0],  // 橙色
+      [0.0, 0.0, 0.0, 1.0]   // 黑色
   ];
 
+  // 基本尺寸
   let baseWidth = 0.08;   
   let baseDepth = 0.1;    
   let heightFactor = 0.1; 
 
+  // 眼睛尺寸 & 位置参数
   let eyeSize = 0.05;        
   let eyeOffsetZ = baseDepth / 2; 
 
-
+  // 间隙
   let gap = 0.01;
 
-
+  // 计算总宽度和起始 x 坐标
   let totalWidth = fishHeights.length * (baseWidth + gap);
   let startX = -totalWidth / 2;
 
+  // 定义 y 方向的偏移量数组
   let yOffsets = [0, -0.1, -0.15, -0.25, -0.38, -0.30, -0.25, -0.15, -0.3, -0.4];
 
+  // 计算第 5 个矩形（索引 4）的 **基准点坐标**
+  let centerX = startX + 4 * (baseWidth + gap) + baseWidth / 2;
+  let centerY = yOffsets[4] + fishHeights[4] * heightFactor / 2;
+
   for (let i = 0; i < fishHeights.length; i++) {
-    let part = new Cube();
-    part.color = fishColors[i] || [0.0, 0.5, 1.0, 1.0];
+      let part = new Cube();
+      part.color = fishColors[i] || [0.0, 0.5, 1.0, 1.0];
 
-    let currentHeight = fishHeights[i] * heightFactor;
-    let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
-    let yPos = currentHeight / 2 + yOffsets[i];
-
-    part.matrix.setTranslate(xPos, yPos, 0);
-    part.matrix.scale(baseWidth, currentHeight, baseDepth);
-
-    part.render();
-
-    if (i === 1) {
-      let leftEye = new Cube();
-      let rightEye = new Cube();
+      let currentHeight = fishHeights[i] * heightFactor;
+      let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
       
-      leftEye.color = [0.0, 0.0, 0.0, 1.0];  
-      rightEye.color = [0.0, 0.0, 0.0, 1.0];
+      // **Y轴对齐动作**
+      let yPos;
+      if (g_bodyBendAngle > 0) {
+          yPos = centerY + currentHeight / 2 - fishHeights[4] * heightFactor / 2;
+      } else if (g_bodyBendAngle < 0) {
+          yPos = centerY - currentHeight / 2 - fishHeights[4] * heightFactor / 2;
+      } else {
+          yPos = yOffsets[i] + currentHeight / 2;
+      }
 
-      leftEye.matrix.setTranslate(xPos, yPos + 0.07, eyeOffsetZ + 0.05);
-      leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1); 
-      leftEye.render();
+      part.matrix.setTranslate(xPos, yPos, 0);
+      
+      // **前 5 个矩形：围绕第 5 个矩形绕 Y 轴摆动**
+      if (i < 5) {
+          // **先移动到基准点（第 5 个矩形的位置）**
+          part.matrix.translate(centerX - xPos, 0, 0);
+          
+          // **绕 y 轴旋转**
+          part.matrix.rotate(g_headSwing, 0, 1, 0);
+          
+          // **再移回原来的 x 轴位置**
+          part.matrix.translate(-(centerX - xPos), 0, 0);
+      }
 
-      rightEye.matrix.setTranslate(xPos, yPos + 0.07, -eyeOffsetZ + 0.04);
-      rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4); 
-      rightEye.render();
-    }
+      part.matrix.scale(baseWidth, currentHeight, baseDepth);
+      part.render();
+
+      // **在第二个长方形（索引1）处添加眼睛**
+      if (i === 1) {
+          let leftEye = new Cube();
+          let rightEye = new Cube();
+          
+          leftEye.color = [0.0, 0.0, 0.0, 1.0];  
+          rightEye.color = [0.0, 0.0, 0.0, 1.0]; 
+
+          leftEye.matrix.setTranslate(xPos, yPos + 0.07, eyeOffsetZ + 0.05);
+          leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1);
+          leftEye.render();
+
+          rightEye.matrix.setTranslate(xPos, yPos + 0.07, -eyeOffsetZ + 0.04);
+          rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4);
+          rightEye.render();
+      }
   }
 }
+
+
+
+
 
 
 
