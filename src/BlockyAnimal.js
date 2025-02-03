@@ -91,7 +91,6 @@ function convertCoordinatesEventToGL(ev) {
   let x = ev.clientX - rect.left;
   let y = ev.clientY - rect.top;
 
-  // 转换为 WebGL 坐标 (范围从 -1 到 1)
   x = (x - canvas.width / 2) / (canvas.width / 2);
   y = (canvas.height / 2 - y) / (canvas.height / 2);
 
@@ -120,15 +119,15 @@ let g_fishPosY = 0.0;
 function addActionForHtmlUI() {
   // Button Event
   document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_fishAnimation=true;});
-  document.getElementById('AnimationYellowOffButton').addEventListener('click', function() {g_fishAnimation = false; g_headSwing = 0; g_tailSwing = 0; renderAllShapes();});
+  document.getElementById('AnimationYellowOffButton').addEventListener('click', function() {g_fishAnimation = false; g_headSwing = 0; g_tailSwing = 0; renderScene();});
 
-  document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderAllShapes();});
-  document.getElementById('headSwingSlider').addEventListener('input', function() {g_headSwing = parseFloat(this.value);renderAllShapes();});
-  document.getElementById('tailSwingSlider').addEventListener('input', function() {g_tailSwing = parseFloat(this.value);renderAllShapes();});
+  document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderScene();});
+  document.getElementById('headSwingSlider').addEventListener('input', function() {g_headSwing = parseFloat(this.value);renderScene();});
+  document.getElementById('tailSwingSlider').addEventListener('input', function() {g_tailSwing = parseFloat(this.value);renderScene();});
 
   
-  document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = parseFloat(this.value); renderAllShapes();});
-  document.getElementById('pitchSlide').addEventListener('input', function() {g_pitchAngle = parseFloat(this.value);renderAllShapes();});
+  document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = parseFloat(this.value); renderScene();});
+  document.getElementById('pitchSlide').addEventListener('input', function() {g_pitchAngle = parseFloat(this.value);renderScene();});
 
   document.getElementById('ResetFishButton').addEventListener('click', resetFish);
   document.getElementById('ResetCameraButton').addEventListener('click', resetCamera);
@@ -163,31 +162,28 @@ function tick() {
 
   updateAnimationAngles();
 
-  renderAllShapes();
+  renderScene();
 
   requestAnimationFrame(tick);
 }
 
 function updateAnimationAngles() {
   if (g_fishAnimation) {
-      g_headSwing = 15 * Math.sin(g_seconds * 2);  // 鱼头摆动
-      g_tailSwing = 20 * Math.sin(g_seconds * 2 + Math.PI);  // 鱼尾反向摆动
+      g_headSwing = 15 * Math.sin(g_seconds * 2);  // Fish head
+      g_tailSwing = 20 * Math.sin(g_seconds * 2 + Math.PI);  // Fish Tail
   }
 
   if (g_fishMoving) {
-      let speed = 0.005; // ✅ 减小速度，限制移动范围
+      let speed = 0.002;
       let angle = Math.sin(g_seconds) * Math.PI * 2;
 
-      // 计算新的位置
       let newX = g_fishPosX + speed * Math.cos(angle);
       let newY = g_fishPosY + speed * Math.sin(angle);
 
-      // ✅ 限制 X, Y 轴的移动范围到 [-0.5, 0.5]
       g_fishPosX = Math.max(-0.5, Math.min(0.5, newX));
       g_fishPosY = Math.max(-0.5, Math.min(0.5, newY));
   }
 }
-
 
 
 function click(ev) {
@@ -196,21 +192,17 @@ function click(ev) {
   if (ev.shiftKey) {
       console.log("Shift + Click detected, triggering continuous movement!");
 
-      g_fishAnimation = true; // 开启鱼头 & 鱼尾动画
-      g_fishMoving = true;  // 开启持续移动
-  } else {
-      g_fishMoving = false; // 停止移动
+      g_fishAnimation = true; 
+      g_fishMoving = !g_fishMoving; 
   }
 
-  renderAllShapes();
+  renderScene();
 }
-
-
 
 
 function renderFishBody() {
   let fishMatrix = new Matrix4();
-  fishMatrix.setTranslate(g_fishPosX, g_fishPosY, 0); // ✅ 应用全局位移
+  fishMatrix.setTranslate(g_fishPosX, g_fishPosY, 0); 
 
   let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
   let fishColors = [
@@ -240,9 +232,10 @@ function renderFishBody() {
                  (g_bodyBendAngle < 0) ? yOffsets[4] + 0.2 :
                  yOffsets[i] + currentHeight / 2;
 
-      part.matrix = new Matrix4(fishMatrix); // ✅ 应用全局移动
+      part.matrix = new Matrix4(fishMatrix);
       part.matrix.translate(xPos, yPos, 0);
       
+      // Head Swing
       if (i < 5) {
           let swingAngle = g_headSwing * Math.pow(decayFactor, i);
           part.matrix.translate(centerX - xPos, 0, 0);
@@ -250,6 +243,7 @@ function renderFishBody() {
           part.matrix.translate(-(centerX - xPos), 0, 0);
       }
 
+      // Tail Swing
       if (i > 4) {
           let swingAngle = -g_tailSwing * Math.pow(decayFactor, 9 - i);
           part.matrix.translate(centerX - xPos, 0, 0);
@@ -260,6 +254,8 @@ function renderFishBody() {
       part.matrix.scale(baseWidth, currentHeight, baseDepth);
       part.render();
 
+
+      // eyes of fish
       if (i === 1) {
           let leftEye = new Cube(), rightEye = new Cube();
           leftEye.color = [0.0, 0.0, 0.0, 1.0];  
@@ -289,24 +285,48 @@ function renderFishBody() {
   }
 }
 
-function renderAllShapes() {
+function renderUnderwaterMountains() {
+  // Tetrahed Position
+  let tetrahedronPositions = [
+      { x: -0.8, y: -0.7, scale: 0.3, color: [0.6, 0.3, 0.1, 1.0] }, 
+      { x: -0.6, y: -0.75, scale: 0.2, color: [0.5, 0.3, 0.2, 1.0] }, 
+      { x: -0.4, y: -0.65, scale: 0.35, color: [0.7, 0.4, 0.2, 1.0] }, 
+      { x: -0.7, y: -0.6, scale: 0.25, color: [0.6, 0.2, 0.1, 1.0] }, 
+      { x: -0.5, y: -0.8, scale: 0.3, color: [0.7, 0.5, 0.3, 1.0] }  
+  ];
+
+  // Render muti tetrahedron
+  for (let i = 0; i < tetrahedronPositions.length; i++) {
+      let data = tetrahedronPositions[i];
+      let tetrahedron = new Tetrahedron();
+      tetrahedron.color = data.color;
+      tetrahedron.matrix.translate(data.x, data.y, 0.0); // 位置
+      tetrahedron.matrix.scale(data.scale, data.scale, data.scale); // 缩小
+      tetrahedron.render();
+  }
+}
+
+
+
+
+function renderScene() {
   var startTime = performance.now();
 
   var globalRotMat = new Matrix4()
-      .rotate(g_globalAngle, 0, 1, 0)   // 水平旋转 (yaw)
-      .rotate(g_pitchAngle, 1, 0, 0);  // 纵向旋转 (pitch)
+      .rotate(g_globalAngle, 0, 1, 0)   //yaw
+      .rotate(g_pitchAngle, 1, 0, 0);  // pitch
   
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+  // Fish body
+  renderUnderwaterMountains();
   renderFishBody();
 
   var duration = performance.now() - startTime;
-  sentTextToHTML("ms: " + Math.floor(duration) + " fps: " +
-      Math.floor(10000/duration)/10, "numdot");
+  sentTextToHTML("ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
 }
-
 
 
 function sentTextToHTML(text, htmlID) {
@@ -330,7 +350,7 @@ function resetFish() {
   g_headSwing = 0.0;
   g_tailSwing = 0.0; 
 
-  renderAllShapes(); 
+  renderScene(); 
 }
 
 function resetCamera() {
@@ -339,7 +359,7 @@ function resetCamera() {
   g_globalAngle = 0.0; 
   g_pitchAngle = 0.0; 
 
-  renderAllShapes();
+  renderScene();
 }
 
 
