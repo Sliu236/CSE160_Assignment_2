@@ -99,20 +99,19 @@ let g_magentaAngle = 0;
 let g_yellowAnimation = false;
 let g_bodyBendAngle = 0.0;
 let g_headSwing = 0.0;
+let g_pitchAngle = 0.0;
 
 function addActionForHtmlUI() {
   // Button Event
   document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_yellowAnimation=true;});
   document.getElementById('AnimationYellowOffButton').addEventListener('click', function() { g_yellowAnimation=false;});
-  document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderAllShapes();
+  document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderAllShapes();});
   document.getElementById('headSwingSlider').addEventListener('input', function() {g_headSwing = parseFloat(this.value);renderAllShapes();});
   
-  
-});
+  document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = parseFloat(this.value); renderAllShapes();});
+  document.getElementById('pitchSlide').addEventListener('input', function() {g_pitchAngle = parseFloat(this.value);renderAllShapes();});
 
-  // Yellow
-  // Camera
-  document.getElementById('angleSlide').addEventListener('mousemove', function() { g_globalAngle = this.value; renderAllShapes();}); // Angle
+
 }
 
 function main() {
@@ -215,7 +214,7 @@ function renderFishBody() {
 
   // 眼睛尺寸 & 位置参数
   let eyeSize = 0.05;        
-  let eyeOffsetZ = baseDepth / 2; 
+  let eyeOffsetZ = baseDepth / 2; // **让眼睛刚好贴住矩形的前后表面**
 
   // 间隙
   let gap = 0.01;
@@ -252,13 +251,8 @@ function renderFishBody() {
       
       // **前 5 个矩形：围绕第 5 个矩形绕 Y 轴摆动**
       if (i < 5) {
-          // **先移动到基准点（第 5 个矩形的位置）**
           part.matrix.translate(centerX - xPos, 0, 0);
-          
-          // **绕 y 轴旋转**
           part.matrix.rotate(g_headSwing, 0, 1, 0);
-          
-          // **再移回原来的 x 轴位置**
           part.matrix.translate(-(centerX - xPos), 0, 0);
       }
 
@@ -273,12 +267,25 @@ function renderFishBody() {
           leftEye.color = [0.0, 0.0, 0.0, 1.0];  
           rightEye.color = [0.0, 0.0, 0.0, 1.0]; 
 
-          leftEye.matrix.setTranslate(xPos, yPos + 0.07, eyeOffsetZ + 0.05);
-          leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.1);
+          // **眼睛必须跟随矩形旋转**
+          let eyeX = xPos;
+          let eyeY = yPos + 0.07;
+          let eyeZFront = eyeOffsetZ + 0.04;   // **前眼睛，贴在第二个矩形前表面**
+          let eyeZBack = -eyeOffsetZ + 0.03;   // **后眼睛，贴在第二个矩形后表面**
+
+          // **应用与矩形相同的旋转**
+          leftEye.matrix.setTranslate(eyeX, eyeY, eyeZFront);
+          leftEye.matrix.translate(centerX - eyeX, 0, 0);
+          leftEye.matrix.rotate(g_headSwing, 0, 1, 0);
+          leftEye.matrix.translate(-(centerX - eyeX), 0, 0);
+          leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.5);
           leftEye.render();
 
-          rightEye.matrix.setTranslate(xPos, yPos + 0.07, -eyeOffsetZ + 0.04);
-          rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.4);
+          rightEye.matrix.setTranslate(eyeX, eyeY, eyeZBack);
+          rightEye.matrix.translate(centerX - eyeX, 0, 0);
+          rightEye.matrix.rotate(g_headSwing, 0, 1, 0);
+          rightEye.matrix.translate(-(centerX - eyeX), 0, 0);
+          rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.5);
           rightEye.render();
       }
   }
@@ -287,15 +294,14 @@ function renderFishBody() {
 
 
 
-
-
-
-
-
 function renderAllShapes() {
   var startTime = performance.now();
 
-  var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
+  // 组合旋转矩阵（绕 Y 轴和 X 轴）
+  var globalRotMat = new Matrix4()
+      .rotate(g_globalAngle, 0, 1, 0)   // 水平旋转 (yaw)
+      .rotate(g_pitchAngle, 1, 0, 0);  // 纵向旋转 (pitch)
+  
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -306,6 +312,7 @@ function renderAllShapes() {
   sentTextToHTML("ms: " + Math.floor(duration) + " fps: " +
       Math.floor(10000/duration)/10, "numdot");
 }
+
 
 
 function sentTextToHTML(text, htmlID) {
