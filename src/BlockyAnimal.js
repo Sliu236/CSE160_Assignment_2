@@ -31,7 +31,8 @@ let u_Size;
 let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let g_globalAngle = 0.0;
-let isRandomColorMode = false;
+let g_fishMoving = false;
+
 
 function setupWebGL() {
     // Retrieve <canvas> element
@@ -85,6 +86,18 @@ function connectVariablesToGLSL() {
     gl.uniformMatrix4fv(u_ModelMatrix, false, identitiyM.elements);
 }
 
+function convertCoordinatesEventToGL(ev) {
+  let rect = canvas.getBoundingClientRect();
+  let x = ev.clientX - rect.left;
+  let y = ev.clientY - rect.top;
+
+  // 转换为 WebGL 坐标 (范围从 -1 到 1)
+  x = (x - canvas.width / 2) / (canvas.width / 2);
+  y = (canvas.height / 2 - y) / (canvas.height / 2);
+
+  return [x, y];
+}
+
 const POINT = 0;
 const TRIANGLE = 1;
 const CIRCLE = 2;
@@ -96,22 +109,29 @@ let g_selectedType = POINT;
 let g_selectedSegments = 10;
 let g_yellowAngle = 0.0;
 let g_magentaAngle = 0;
-let g_yellowAnimation = false;
+let g_fishAnimation = false;
 let g_bodyBendAngle = 0.0;
 let g_headSwing = 0.0;
+let g_tailSwing = 0.0;
 let g_pitchAngle = 0.0;
+let g_fishPosX = 0.0;
+let g_fishPosY = 0.0;
 
 function addActionForHtmlUI() {
   // Button Event
-  document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_yellowAnimation=true;});
-  document.getElementById('AnimationYellowOffButton').addEventListener('click', function() { g_yellowAnimation=false;});
+  document.getElementById('AnimationYellowOnButton').addEventListener('click', function() { g_fishAnimation=true;});
+  document.getElementById('AnimationYellowOffButton').addEventListener('click', function() {g_fishAnimation = false; g_headSwing = 0; g_tailSwing = 0; renderAllShapes();});
+
   document.getElementById('bodyBendSlide').addEventListener('mousemove', function() { g_bodyBendAngle = this.value * 0.1; renderAllShapes();});
   document.getElementById('headSwingSlider').addEventListener('input', function() {g_headSwing = parseFloat(this.value);renderAllShapes();});
+  document.getElementById('tailSwingSlider').addEventListener('input', function() {g_tailSwing = parseFloat(this.value);renderAllShapes();});
+
   
   document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = parseFloat(this.value); renderAllShapes();});
   document.getElementById('pitchSlide').addEventListener('input', function() {g_pitchAngle = parseFloat(this.value);renderAllShapes();});
 
-
+  document.getElementById('ResetFishButton').addEventListener('click', resetFish);
+  document.getElementById('ResetCameraButton').addEventListener('click', resetCamera);
 }
 
 function main() {
@@ -129,11 +149,6 @@ function main() {
 
   // Specify the color for clearing <canvas>
   gl.clearColor(0.678, 0.847, 1, 1.0);
-
-  // Clear <canvas>
-  // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  //renderAllShapes(); // Render all shapes
 
   requestAnimationFrame(tick);
 }
@@ -154,81 +169,65 @@ function tick() {
 }
 
 function updateAnimationAngles() {
-  if (g_yellowAnimation) {
-    g_yellowAngle = 45*Math.sin(g_seconds);
+  if (g_fishAnimation) {
+      g_headSwing = 15 * Math.sin(g_seconds * 2);  // 鱼头摆动
+      g_tailSwing = 20 * Math.sin(g_seconds * 2 + Math.PI);  // 鱼尾反向摆动
+  }
+
+  if (g_fishMoving) {
+      let speed = 0.005; // ✅ 减小速度，限制移动范围
+      let angle = Math.sin(g_seconds) * Math.PI * 2;
+
+      // 计算新的位置
+      let newX = g_fishPosX + speed * Math.cos(angle);
+      let newY = g_fishPosY + speed * Math.sin(angle);
+
+      // ✅ 限制 X, Y 轴的移动范围到 [-0.5, 0.5]
+      g_fishPosX = Math.max(-0.5, Math.min(0.5, newX));
+      g_fishPosY = Math.max(-0.5, Math.min(0.5, newY));
   }
 }
 
 
-function click(ev) {
 
+function click(ev) {
   let [x, y] = convertCoordinatesEventToGL(ev);
 
-  let point;
-  if(isRandomColorMode) {
-    let randomType = Math.floor(Math.random() * 3); // randon type
-    g_selectedType = randomType;
+  if (ev.shiftKey) {
+      console.log("Shift + Click detected, triggering continuous movement!");
 
-    let randomSize = Math.random() * 0 + 55; // random size
-    g_selectedSize = randomSize;
-
-    g_selectedColor = getRandomColor();
+      g_fishAnimation = true; // 开启鱼头 & 鱼尾动画
+      g_fishMoving = true;  // 开启持续移动
+  } else {
+      g_fishMoving = false; // 停止移动
   }
-  if(g_selectedType == POINT) { 
-    point = new Point();
-  } else if (g_selectedType == TRIANGLE) { 
-    point = new Triangle();
-  } else if (g_selectedType == CIRCLE) { 
-    point = new Circle();
-  }
-  point.position = [x, y];
-  point.color = isRandomColorMode ? getRandomColor() : g_selectedColor.slice();
-  point.size = g_selectedSize;
-  g_shapeList.push(point);
 
   renderAllShapes();
 }
 
-function renderFishBody() {
-  // 鱼体各部分高度比例
-  let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
 
-  // 定义颜色数组
+
+
+function renderFishBody() {
+  let fishMatrix = new Matrix4();
+  fishMatrix.setTranslate(g_fishPosX, g_fishPosY, 0); // ✅ 应用全局位移
+
+  let fishHeights = [1, 2, 2.5, 3.5, 5.2, 4.3, 3.5, 2.5, 4.0, 5];
   let fishColors = [
-      [1.0, 0.5, 0.0, 1.0],  // 橙色
-      [1.0, 0.5, 0.0, 1.0],  // 橙色（眼睛在此部分）
-      [1.0, 1.0, 1.0, 1.0],  // 白色
-      [1.0, 0.5, 0.0, 1.0],  // 橙色
-      [0.0, 0.0, 0.0, 1.0],  // 黑色（基准点）
-      [1.0, 1.0, 1.0, 1.0],  // 白色
-      [1.0, 0.5, 0.0, 1.0],  // 橙色
-      [1.0, 1.0, 1.0, 1.0],  // 白色
-      [1.0, 0.5, 0.0, 1.0],  // 橙色
-      [0.0, 0.0, 0.0, 1.0]   // 黑色
+      [1.0, 0.5, 0.0, 1.0], [1.0, 0.5, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0],
+      [1.0, 0.5, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0],
+      [1.0, 0.5, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 0.5, 0.0, 1.0],
+      [0.0, 0.0, 0.0, 1.0]
   ];
 
-  // 基本尺寸
-  let baseWidth = 0.08;   
-  let baseDepth = 0.1;    
-  let heightFactor = 0.1; 
-
-  // 眼睛尺寸 & 位置参数
-  let eyeSize = 0.05;        
-  let eyeOffsetZ = baseDepth / 2; // **让眼睛刚好贴住矩形的前后表面**
-
-  // 间隙
-  let gap = 0.01;
-
-  // 计算总宽度和起始 x 坐标
-  let totalWidth = fishHeights.length * (baseWidth + gap);
+  let baseWidth = 0.08, baseDepth = 0.1, heightFactor = 0.1;
+  let eyeSize = 0.05, eyeOffsetZ = baseDepth / 2;
+  let gap = 0.01, totalWidth = fishHeights.length * (baseWidth + gap);
   let startX = -totalWidth / 2;
-
-  // 定义 y 方向的偏移量数组
   let yOffsets = [0, -0.1, -0.15, -0.25, -0.38, -0.30, -0.25, -0.15, -0.3, -0.4];
-
-  // 计算第 5 个矩形（索引 4）的 **基准点坐标**
   let centerX = startX + 4 * (baseWidth + gap) + baseWidth / 2;
-  let centerY = yOffsets[4] + fishHeights[4] * heightFactor / 2;
+
+  let decayFactor = 0.6;  
 
   for (let i = 0; i < fishHeights.length; i++) {
       let part = new Cube();
@@ -237,53 +236,52 @@ function renderFishBody() {
       let currentHeight = fishHeights[i] * heightFactor;
       let xPos = startX + i * (baseWidth + gap) + baseWidth / 2;
       
-      // **Y轴对齐动作**
-      let yPos;
-      if (g_bodyBendAngle > 0) {
-          yPos = centerY + currentHeight / 2 - fishHeights[4] * heightFactor / 2;
-      } else if (g_bodyBendAngle < 0) {
-          yPos = centerY - currentHeight / 2 - fishHeights[4] * heightFactor / 2;
-      } else {
-          yPos = yOffsets[i] + currentHeight / 2;
-      }
+      let yPos = (g_bodyBendAngle > 0) ? yOffsets[4] + fishHeights[4] * heightFactor - currentHeight + 0.3 :
+                 (g_bodyBendAngle < 0) ? yOffsets[4] + 0.2 :
+                 yOffsets[i] + currentHeight / 2;
 
-      part.matrix.setTranslate(xPos, yPos, 0);
+      part.matrix = new Matrix4(fishMatrix); // ✅ 应用全局移动
+      part.matrix.translate(xPos, yPos, 0);
       
-      // **前 5 个矩形：围绕第 5 个矩形绕 Y 轴摆动**
       if (i < 5) {
+          let swingAngle = g_headSwing * Math.pow(decayFactor, i);
           part.matrix.translate(centerX - xPos, 0, 0);
-          part.matrix.rotate(g_headSwing, 0, 1, 0);
+          part.matrix.rotate(swingAngle, 0, 1, 0);
           part.matrix.translate(-(centerX - xPos), 0, 0);
       }
 
+      if (i > 4) {
+          let swingAngle = -g_tailSwing * Math.pow(decayFactor, 9 - i);
+          part.matrix.translate(centerX - xPos, 0, 0);
+          part.matrix.rotate(swingAngle, 0, 1, 0);
+          part.matrix.translate(-(centerX - xPos), 0, 0);
+      }
+    
       part.matrix.scale(baseWidth, currentHeight, baseDepth);
       part.render();
 
-      // **在第二个长方形（索引1）处添加眼睛**
       if (i === 1) {
-          let leftEye = new Cube();
-          let rightEye = new Cube();
-          
+          let leftEye = new Cube(), rightEye = new Cube();
           leftEye.color = [0.0, 0.0, 0.0, 1.0];  
           rightEye.color = [0.0, 0.0, 0.0, 1.0]; 
 
-          // **眼睛必须跟随矩形旋转**
-          let eyeX = xPos;
-          let eyeY = yPos + 0.07;
-          let eyeZFront = eyeOffsetZ + 0.04;   // **前眼睛，贴在第二个矩形前表面**
-          let eyeZBack = -eyeOffsetZ + 0.03;   // **后眼睛，贴在第二个矩形后表面**
+          let eyeX = xPos, eyeY = yPos + 0.07;
+          let eyeZFront = eyeOffsetZ + 0.04, eyeZBack = -eyeOffsetZ + 0.03;
 
-          // **应用与矩形相同的旋转**
-          leftEye.matrix.setTranslate(eyeX, eyeY, eyeZFront);
+          let swingAngle = g_headSwing * Math.pow(decayFactor, 1);
+
+          leftEye.matrix = new Matrix4(fishMatrix);
+          leftEye.matrix.translate(eyeX, eyeY, eyeZFront);
           leftEye.matrix.translate(centerX - eyeX, 0, 0);
-          leftEye.matrix.rotate(g_headSwing, 0, 1, 0);
+          leftEye.matrix.rotate(swingAngle, 0, 1, 0);
           leftEye.matrix.translate(-(centerX - eyeX), 0, 0);
           leftEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.5);
           leftEye.render();
 
-          rightEye.matrix.setTranslate(eyeX, eyeY, eyeZBack);
+          rightEye.matrix = new Matrix4(fishMatrix);
+          rightEye.matrix.translate(eyeX, eyeY, eyeZBack);
           rightEye.matrix.translate(centerX - eyeX, 0, 0);
-          rightEye.matrix.rotate(g_headSwing, 0, 1, 0);
+          rightEye.matrix.rotate(swingAngle, 0, 1, 0);
           rightEye.matrix.translate(-(centerX - eyeX), 0, 0);
           rightEye.matrix.scale(eyeSize, eyeSize, eyeSize * 0.5);
           rightEye.render();
@@ -291,13 +289,9 @@ function renderFishBody() {
   }
 }
 
-
-
-
 function renderAllShapes() {
   var startTime = performance.now();
 
-  // 组合旋转矩阵（绕 Y 轴和 X 轴）
   var globalRotMat = new Matrix4()
       .rotate(g_globalAngle, 0, 1, 0)   // 水平旋转 (yaw)
       .rotate(g_pitchAngle, 1, 0, 0);  // 纵向旋转 (pitch)
@@ -324,7 +318,29 @@ function sentTextToHTML(text, htmlID) {
   htmlElm.innerHTML = text;
 }
 
+function resetFish() {
+  console.log("Resetting fish position and stopping animation.");
 
+  g_fishMoving = false;  
+  g_fishAnimation = false; 
+
+  g_fishPosX = 0.0; 
+  g_fishPosY = 0.0; 
+
+  g_headSwing = 0.0;
+  g_tailSwing = 0.0; 
+
+  renderAllShapes(); 
+}
+
+function resetCamera() {
+  console.log("Resetting camera position.");
+
+  g_globalAngle = 0.0; 
+  g_pitchAngle = 0.0; 
+
+  renderAllShapes();
+}
 
 
 
