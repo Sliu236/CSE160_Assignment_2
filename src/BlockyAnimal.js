@@ -131,6 +131,21 @@ function addActionForHtmlUI() {
 
   document.getElementById('ResetFishButton').addEventListener('click', resetFish);
   document.getElementById('ResetCameraButton').addEventListener('click', resetCamera);
+
+  canvas.addEventListener("mousedown", function (ev) {g_mouseDragging = true; g_lastMouseX = ev.clientX; g_lastMouseY = ev.clientY;});
+
+  canvas.addEventListener("mousemove", function (ev) {
+    if (g_mouseDragging) {
+          let dx = ev.clientX - g_lastMouseX;
+          let dy = ev.clientY - g_lastMouseY;
+          g_globalAngle += dx * 0.5;  
+          g_pitchAngle -= dy * 0.5;
+          g_pitchAngle = Math.max(-90, Math.min(90, g_pitchAngle));
+          g_lastMouseX = ev.clientX;
+          g_lastMouseY = ev.clientY;
+          
+          renderScene();
+      }});
 }
 
 function main() {
